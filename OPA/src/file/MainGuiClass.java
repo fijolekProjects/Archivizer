@@ -1,17 +1,22 @@
 package file;
 
 import java.awt.BorderLayout;
-import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Vector;
@@ -35,20 +40,23 @@ public class MainGuiClass extends JPanel implements ActionListener {
     private JButton addFile;
     private JButton removeFile;
     private JFileChooser fileChooser;
-    private final JTable table = new JTable(new MyTableModel());
-    private MyTableModel tableModel = (MyTableModel) table.getModel();
+    private final JTable table;
+    private static MyTableModel tableModel;
     private String currentFilename;
-    private List<String> checksumList = new ArrayList<String>();
+    private static List<String> checksumList = new ArrayList<String>();
     private static JFrame frame;
     private static FileServer server = new FileServer();
     private static TestClient client = new TestClient();
 
+    private static List<String[]> allRowsData = new ArrayList<String[]>();
+
+    private String tempFileName;
+    private String[] tempData;
+
     public MainGuiClass() {
 	super(new BorderLayout());
-
-//	table.setPreferredScrollableViewportSize(new Dimension(500, 70));
-//	table.setFillsViewportHeight(true);
-
+	table = new JTable(new MyTableModel());
+	tableModel = (MyTableModel) table.getModel();
 	JScrollPane scrollPane = new JScrollPane(table);
 
 	add(scrollPane);
@@ -127,14 +135,74 @@ public class MainGuiClass extends JPanel implements ActionListener {
     }
 
     private static void createAndShowGUI() {
+
 	frame = new JFrame("Archivizer");
+	frame.addWindowListener(new WindowAdapter() {
+	    @Override
+	    public void windowClosing(WindowEvent e) {
+		try {
+		    saveProgramState(allRowsData);
+		} catch (IOException e1) {
+		    e1.printStackTrace();
+		}
+		System.exit(0);
+	    }
+	});
 	frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 	MainGuiClass newContentPane = new MainGuiClass();
 	frame.setContentPane(newContentPane);
 	// Display the window.
 	frame.setSize(1000, 600);
+	try {
+	    loadProgramState();
+	} catch (IOException e2) {
+	    e2.printStackTrace();
+	}
 	// frame.pack();
 	frame.setVisible(true);
+    }
+
+    private static void loadProgramState() throws IOException {
+	FileInputStream fileInProgram = new FileInputStream("programSavedState.dat");
+	ObjectInputStream objInProgram = new ObjectInputStream(fileInProgram);
+	try {
+	    @SuppressWarnings("unchecked")
+	    ArrayList<String[]> objProgram = (ArrayList<String[]>) objInProgram.readObject();
+	    for (int i = 0; i < objProgram.size(); i++) {
+		allRowsData.add(objProgram.get(i));
+		tableModel.insertData(allRowsData.get(i));
+	    }
+	    objInProgram.close();
+	} catch (ClassNotFoundException e) {
+	    e.printStackTrace();
+	}
+	
+	FileInputStream fileInChecksum = new FileInputStream("checksumSavedState.dat");
+	ObjectInputStream objInChecksum = new ObjectInputStream(fileInChecksum);
+	try {
+	    @SuppressWarnings("unchecked")
+	    ArrayList<String> objChecksum = (ArrayList<String>) objInChecksum.readObject();
+	    for (int i = 0; i < objChecksum.size(); i++) {
+		checksumList.add(objChecksum.get(i));
+	    }
+	    objInChecksum.close();
+	} catch (ClassNotFoundException e) {
+	    e.printStackTrace();
+	}
+	
+
+    }
+
+    private static void saveProgramState(List<String[]> allDataList) throws IOException {
+	FileOutputStream fileOutProgram = new FileOutputStream("programSavedState.dat");
+	ObjectOutputStream objOutProgram = new ObjectOutputStream(fileOutProgram);
+	objOutProgram.writeObject(allRowsData);
+	objOutProgram.close();
+	
+	FileOutputStream fileOutChecksum = new FileOutputStream("checksumSavedState.dat");
+	ObjectOutputStream objOutChecksum = new ObjectOutputStream(fileOutChecksum);
+	objOutChecksum.writeObject(checksumList);
+	objOutChecksum.close();
     }
 
     public static void main(String[] args) throws Exception {
@@ -164,31 +232,45 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	int returnVal = fileChooser.showOpenDialog(MainGuiClass.this);
 
 	if (returnVal == JFileChooser.APPROVE_OPTION) {
-	    File file[] = fileChooser.getSelectedFiles();
+	    final File file[] = fileChooser.getSelectedFiles();
 
-	    for (int i = 0; i < file.length; i++) {
-		try {
-		    if (!checksumList.contains(computeMD5(file[i]))) {
+	    Thread sendingFilesThread = new Thread(new Runnable() {
 
-			tableModel.insertData(prepareRowData(file[i]));
-
-			TestClient.setFileName(file[i].getAbsoluteFile().toString());
+		@Override
+		public void run() {
+		    for (int i = 0; i < file.length; i++) {
 
 			try {
-			    client.startClient();
-			} catch (Exception e1) {
-			    e1.printStackTrace();
+			    if (!checksumList.contains(computeMD5(file[i]))) {
+
+				tempFileName = file[i].getAbsoluteFile().toString();
+
+				TestClient.setFileName(tempFileName);
+
+				try {
+				    client.startClient();
+				} catch (Exception e1) {
+				    e1.printStackTrace();
+				}
+
+				tempData = prepareRowData(file[i]);
+				allRowsData.add(tempData);
+				tableModel.insertData(tempData);
+
+			    } else {
+				currentFilename = file[i].getName();
+				JOptionPane.showMessageDialog(frame, "File: " + currentFilename
+					+ " has been already archivized! Try different file.",
+					"Warning!", JOptionPane.WARNING_MESSAGE);
+			    }
+			} catch (NoSuchAlgorithmException | IOException e2) {
+			    e2.printStackTrace();
 			}
-		    } else {
-			currentFilename = file[i].getName();
-			JOptionPane.showMessageDialog(frame, "File: " + currentFilename
-				+ " has been already archivized! Try different file.", "Warning!",
-				JOptionPane.WARNING_MESSAGE);
 		    }
-		} catch (NoSuchAlgorithmException | IOException e2) {
-		    e2.printStackTrace();
+
 		}
-	    }
+	    });
+	    sendingFilesThread.start();
 	}
     }
 
@@ -196,9 +278,10 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	try {
 	    int[] rowsSelected = table.getSelectedRows();
 
-	    for (byte i = 0; i < rowsSelected.length; i++) {
+	    for (int i = 0; i < rowsSelected.length; i++) {
 		tableModel.removeRow(rowsSelected[i] - i);
 		checksumList.remove(rowsSelected[i] - i);
+		allRowsData.remove(rowsSelected[i] - i);
 	    }
 
 	} catch (ArrayIndexOutOfBoundsException ex) {
