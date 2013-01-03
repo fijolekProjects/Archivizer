@@ -19,11 +19,11 @@ public class TestClient {
 	return fileName;
     }
 
-    public synchronized static void setFileName(String fileName) {
+    public static void setFileName(String fileName) {
 	TestClient.fileName = fileName;
     }
 
-    public synchronized void startClient() throws Exception {
+    public void startClient() throws Exception {
 	// grab the file name from the commandline
 
 	// get a handle to the remote service to which we want to send the file

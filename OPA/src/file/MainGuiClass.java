@@ -16,7 +16,6 @@ import java.security.NoSuchAlgorithmException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Vector;
@@ -47,7 +46,6 @@ public class MainGuiClass extends JPanel implements ActionListener {
     private static JFrame frame;
     private static FileServer server = new FileServer();
     private static TestClient client = new TestClient();
-
     private static List<String[]> allRowsData = new ArrayList<String[]>();
 
     private String tempFileName;
@@ -176,7 +174,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	} catch (ClassNotFoundException e) {
 	    e.printStackTrace();
 	}
-	
+
 	FileInputStream fileInChecksum = new FileInputStream("checksumSavedState.dat");
 	ObjectInputStream objInChecksum = new ObjectInputStream(fileInChecksum);
 	try {
@@ -189,7 +187,6 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	} catch (ClassNotFoundException e) {
 	    e.printStackTrace();
 	}
-	
 
     }
 
@@ -198,7 +195,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	ObjectOutputStream objOutProgram = new ObjectOutputStream(fileOutProgram);
 	objOutProgram.writeObject(allRowsData);
 	objOutProgram.close();
-	
+
 	FileOutputStream fileOutChecksum = new FileOutputStream("checksumSavedState.dat");
 	ObjectOutputStream objOutChecksum = new ObjectOutputStream(fileOutChecksum);
 	objOutChecksum.writeObject(checksumList);
