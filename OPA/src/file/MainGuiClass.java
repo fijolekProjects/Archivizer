@@ -1,6 +1,7 @@
 package file;
 
 import java.awt.BorderLayout;
+import java.awt.Desktop;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
@@ -36,19 +37,24 @@ public class MainGuiClass extends JPanel implements ActionListener {
      */
     private static final long serialVersionUID = 1L;
 
-    private JButton addFile;
+    private JButton sendFileToServer;
+    private JButton getFileFromServer;
     private JButton removeFile;
+    private JButton openFile;
     private JFileChooser fileChooser;
     private final JTable table;
-    private static MyTableModel tableModel;
     private String currentFilename;
-    private static List<String> checksumList = new ArrayList<String>();
+
+    private static MyTableModel tableModel;
     private static JFrame frame;
     private static FileServer server = new FileServer();
     private static TestClient client = new TestClient();
     private static List<String[]> allRowsData = new ArrayList<String[]>();
-
-    private String tempFileName;
+    private static List<String> checksumList = new ArrayList<String>();
+    private static List<String> allFilenameList = new ArrayList<String>();
+    private static List<String> filesGotFromServer = new ArrayList<String>();
+    
+    private String tempFromClientSentFilename;
     private String[] tempData;
 
     public MainGuiClass() {
@@ -61,13 +67,22 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	fileChooser = new JFileChooser();
 	fileChooser.setMultiSelectionEnabled(true);
 
-	addFile = new JButton("Choose file...");
-	addFile.addActionListener(this);
-	add(addFile, BorderLayout.AFTER_LINE_ENDS);
+	sendFileToServer = new JButton("Add file to server");
+	sendFileToServer.addActionListener(this);
+	add(sendFileToServer, BorderLayout.AFTER_LINE_ENDS);
 
 	removeFile = new JButton("Remove file");
 	removeFile.addActionListener(this);
 	add(removeFile, BorderLayout.AFTER_LAST_LINE);
+
+	getFileFromServer = new JButton("Get file from server");
+	getFileFromServer.addActionListener(this);
+	add(getFileFromServer, BorderLayout.WEST);
+
+	openFile = new JButton("Open file");
+	openFile.addActionListener(this);
+	add(openFile, BorderLayout.NORTH);
+
     };
 
     class MyTableModel extends AbstractTableModel {
@@ -77,7 +92,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	private static final long serialVersionUID = 1L;
 
 	private String[] columnNames = { "Filename", "Archivize Date", "Filesize", "MD5 checksum",
-		"Filepath" };
+	"Filepath" };
 	private Vector<Vector<Object>> data = new Vector<Vector<Object>>();
 
 	@Override
@@ -139,7 +154,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	    @Override
 	    public void windowClosing(WindowEvent e) {
 		try {
-		    saveProgramState(allRowsData);
+		    saveProgramState();
 		} catch (IOException e1) {
 		    e1.printStackTrace();
 		}
@@ -188,9 +203,35 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	    e.printStackTrace();
 	}
 
+	FileInputStream fileInAllFilenameList = new FileInputStream("allFilenamesSavedState.dat");
+	ObjectInputStream objInAllFilenameList = new ObjectInputStream(fileInAllFilenameList);
+	try {
+	    @SuppressWarnings("unchecked")
+	    ArrayList<String> objAllFilenameList = (ArrayList<String>) objInAllFilenameList.readObject();
+	    for (int i = 0; i < objAllFilenameList.size(); i++) {
+		allFilenameList.add(objAllFilenameList.get(i));
+	    }
+	    objInAllFilenameList.close();
+	} catch (ClassNotFoundException e) {
+	    e.printStackTrace();
+	}
+	
+	FileInputStream fileInFilesGotFromServer = new FileInputStream("filesGotFromServerSavedState.dat");
+	ObjectInputStream objInFilesGotFromServer = new ObjectInputStream(fileInFilesGotFromServer);
+	try {
+	    @SuppressWarnings("unchecked")
+	    ArrayList<String> objFilesGotFromServer = (ArrayList<String>) objInFilesGotFromServer.readObject();
+	    for (int i = 0; i < objFilesGotFromServer.size(); i++) {
+		filesGotFromServer.add(objFilesGotFromServer.get(i));
+	    }
+	    objInFilesGotFromServer.close();
+	} catch (ClassNotFoundException e) {
+	    e.printStackTrace();
+	}	
+
     }
 
-    private static void saveProgramState(List<String[]> allDataList) throws IOException {
+    private static void saveProgramState() throws IOException {
 	FileOutputStream fileOutProgram = new FileOutputStream("programSavedState.dat");
 	ObjectOutputStream objOutProgram = new ObjectOutputStream(fileOutProgram);
 	objOutProgram.writeObject(allRowsData);
@@ -200,6 +241,16 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	ObjectOutputStream objOutChecksum = new ObjectOutputStream(fileOutChecksum);
 	objOutChecksum.writeObject(checksumList);
 	objOutChecksum.close();
+
+	FileOutputStream fileOutAllFilenameList = new FileOutputStream("allFilenamesSavedState.dat");
+	ObjectOutputStream objOutAllFilenameList = new ObjectOutputStream(fileOutAllFilenameList);
+	objOutAllFilenameList.writeObject(allFilenameList);
+	objOutAllFilenameList.close();
+	
+	FileOutputStream fileOutFilesGotFromServer = new FileOutputStream("filesGotFromServerSavedState.dat");
+	ObjectOutputStream objOutFilesGotFromServer = new ObjectOutputStream(fileOutFilesGotFromServer);
+	objOutFilesGotFromServer.writeObject(filesGotFromServer);
+	objOutFilesGotFromServer.close();
     }
 
     public static void main(String[] args) throws Exception {
@@ -216,22 +267,51 @@ public class MainGuiClass extends JPanel implements ActionListener {
     @Override
     public void actionPerformed(ActionEvent e) {
 
-	if (e.getSource() == addFile) {
-	    addFileButtonAction(e);
+	if (e.getSource() == sendFileToServer) {
+	    sendFileToServerButtonAction(e);
 	}
 	if (e.getSource() == removeFile) {
 	    removeFileButtonAction(e);
 	}
+	if (e.getSource() == getFileFromServer) {
+	    getFileFromServerButtonAction(e);
+	}
+	if (e.getSource() == openFile) {
+	    openFileButtonAction(e);
+	}
 
     }
 
-    private void addFileButtonAction(ActionEvent e) {
+
+
+    private void openFileButtonAction(ActionEvent e) {
+	Desktop desktop = Desktop.getDesktop();
+	int rowSelected = table.getSelectedRow();
+	String filenameToOpen = allFilenameList.get(rowSelected);
+
+	if (filesGotFromServer.contains(filenameToOpen)) {
+	    String tDir = System.getProperty("java.io.tmpdir");
+	    File fileToOpen = new File(tDir + File.separator + "fromServer" + filenameToOpen);
+	    try {
+		desktop.open(fileToOpen);
+	    } catch (IOException e1) {
+		// TODO Auto-generated catch block
+		e1.printStackTrace();
+	    }
+	} else {
+	    JOptionPane.showMessageDialog(frame, "File: " + filenameToOpen
+			+ " has not been got from server! Get file from server first",
+			"Warning!", JOptionPane.WARNING_MESSAGE);
+	}
+    }
+
+    private void sendFileToServerButtonAction(ActionEvent e) {
 	int returnVal = fileChooser.showOpenDialog(MainGuiClass.this);
 
 	if (returnVal == JFileChooser.APPROVE_OPTION) {
 	    final File file[] = fileChooser.getSelectedFiles();
 
-	    Thread sendingFilesThread = new Thread(new Runnable() {
+	    Thread sendFilesFromClientThread = new Thread(new Runnable() {
 
 		@Override
 		public void run() {
@@ -240,12 +320,13 @@ public class MainGuiClass extends JPanel implements ActionListener {
 			try {
 			    if (!checksumList.contains(computeMD5(file[i]))) {
 
-				tempFileName = file[i].getAbsoluteFile().toString();
 
-				TestClient.setFileName(tempFileName);
+				tempFromClientSentFilename = file[i].getAbsoluteFile().toString();
+				TestClient.setFromClientSentFilename(tempFromClientSentFilename);
 
+				allFilenameList.add(file[i].getName());
 				try {
-				    client.startClient();
+				    client.sendFileFromClient();
 				} catch (Exception e1) {
 				    e1.printStackTrace();
 				}
@@ -267,8 +348,40 @@ public class MainGuiClass extends JPanel implements ActionListener {
 
 		}
 	    });
-	    sendingFilesThread.start();
+	    sendFilesFromClientThread.start();
 	}
+    }
+
+    private void getFileFromServerButtonAction(ActionEvent e) {
+
+	Thread getFilesFromServerThread = new Thread(new Runnable() {
+
+	    @Override
+	    public void run() {
+		int[] rowsSelected = table.getSelectedRows();
+		for (int i = 0; i < rowsSelected.length; i++) {
+		    filesGotFromServer.add(allFilenameList.get(rowsSelected[i]));
+		    FileServer.setFromServerGotFilename(allFilenameList.get(rowsSelected[i]));
+		    try {
+			client.getFileFromServer();
+		    } catch (Exception e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		    }
+		}
+
+	    }
+	});
+	getFilesFromServerThread.start();
+	//	for (int i = 0; i < rowsSelected.length; i++) {
+	//	    FileServer.setFromServerGotFilename(allFilenameList.get(rowsSelected[i]));
+	//	    try {
+	//		client.getFileFromServer();
+	//	    } catch (Exception e1) {
+	//		// TODO Auto-generated catch block
+	//		e1.printStackTrace();
+	//	    }
+	//	}
     }
 
     private void removeFileButtonAction(ActionEvent e) {
@@ -279,12 +392,15 @@ public class MainGuiClass extends JPanel implements ActionListener {
 		tableModel.removeRow(rowsSelected[i] - i);
 		checksumList.remove(rowsSelected[i] - i);
 		allRowsData.remove(rowsSelected[i] - i);
+		allFilenameList.remove(rowsSelected[i] - i);
+		filesGotFromServer.remove(allFilenameList.get(rowsSelected[i] - i));
 	    }
 
 	} catch (ArrayIndexOutOfBoundsException ex) {
 	    // Nothing happens, only to preserve printing exception to console
 	}
     }
+
 
     private String[] prepareRowData(File file) {
 	String fileName = file.getName();
