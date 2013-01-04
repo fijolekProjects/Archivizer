@@ -279,7 +279,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	if (e.getSource() == openFile) {
 	    openFileButtonAction(e);
 	}
-
+ 
     }
 
 
