@@ -21,6 +21,7 @@ import com.healthmarketscience.rmiio.SimpleRemoteOutputStream;
 public class TestClient implements RemoteClient{
     private static String fromClientSentFilename;
     private RemoteFileServer stubServer;
+    private Registry registry;
     
     @Override
     public String getFromClientSentFilename() throws RemoteException {
@@ -31,12 +32,12 @@ public class TestClient implements RemoteClient{
 	TestClient.fromClientSentFilename = fileName;
     }
     
-    public void startClient() throws Exception {
+    public void startClient(String hostName, int portNumber) throws Exception {
 	TestClient client = new TestClient();
 	RemoteClient stubClient = (RemoteClient) UnicastRemoteObject.exportObject(client, 0);
 	
 	// bind to registry
-	Registry registry = LocateRegistry.getRegistry();
+	registry = LocateRegistry.getRegistry(hostName, portNumber);
 	registry.bind("RemoteClient", stubClient);
     }
     @Override
@@ -71,12 +72,11 @@ public class TestClient implements RemoteClient{
     }
     @Override
     public void getFileFromServer() throws Exception {
-	
+	createStubServer();
 	System.out.println("Sending file from server");
 	String tempDirectory = System.getProperty("java.io.tmpdir");
 	SimpleRemoteOutputStream ostream;
 
-	createStubServer();
 	ostream = new SimpleRemoteOutputStream(new FileOutputStream(tempDirectory + File.separator
 		+ "clientSide__" + stubServer.getFromServerGotFilename()));
 	try {
@@ -100,7 +100,7 @@ public class TestClient implements RemoteClient{
     
     private void createStubServer() {
 	try {
-	    Registry registry = LocateRegistry.getRegistry();
+//	    Registry registry = LocateRegistry.getRegistry();
 	    stubServer = (RemoteFileServer) registry.lookup("RemoteFileServer");
 	} catch (RemoteException | NotBoundException e) {
 	    e.printStackTrace();

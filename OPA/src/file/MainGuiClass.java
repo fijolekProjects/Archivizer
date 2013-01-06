@@ -28,12 +28,17 @@ import java.util.Vector;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
+
+import sun.awt.geom.AreaOp.AddOp;
 
 public class MainGuiClass extends JPanel implements ActionListener {
     /**
@@ -97,7 +102,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	 */
 	private static final long serialVersionUID = 1L;
 	private String[] columnNames = { "Filename", "Archivize Date", "Filesize", "MD5 checksum",
-		"Original Filepath" };
+	"Original Filepath" };
 	private Vector<Vector<Object>> data = new Vector<Vector<Object>>();
 
 	@Override
@@ -139,9 +144,9 @@ public class MainGuiClass extends JPanel implements ActionListener {
     private static void createAndShowGUI() {
 
 	frame = new JFrame("Archivizer");
+
 	frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 	MainGuiClass newContentPane = new MainGuiClass();
-	frame.setContentPane(newContentPane);
 	frame.setSize(1000, 600);
 	frame.setVisible(true);
 
@@ -368,7 +373,8 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	} catch (RemoteException e) {
 	    e.printStackTrace();
 	}
-	client.removeFileFromClient(currentFileToRemove);
+	// client.removeFileFromClient(currentFileToRemove);
+	// TODO zostawic?
 	allFilenameList.remove(row);
 
     }
@@ -428,13 +434,13 @@ public class MainGuiClass extends JPanel implements ActionListener {
 
     public static void main(String[] args) throws Exception {
 
-	server.startServer();
-	client.startClient();
-
 	SwingUtilities.invokeLater(new Runnable() {
 	    public void run() {
 		createAndShowGUI();
 	    }
 	});
+	server.startServer();
+	// TODO dodac wybieranie hostname i port przez uzytkownika
+	client.startClient("localhost", 1099);
     }
 }
