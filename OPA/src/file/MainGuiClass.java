@@ -97,7 +97,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	 */
 	private static final long serialVersionUID = 1L;
 	private String[] columnNames = { "Filename", "Archivize Date", "Filesize", "MD5 checksum",
-	"Original Filepath" };
+		"Original Filepath" };
 	private Vector<Vector<Object>> data = new Vector<Vector<Object>>();
 
 	@Override
@@ -144,6 +144,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	frame.setContentPane(newContentPane);
 	frame.setSize(1000, 600);
 	frame.setVisible(true);
+
 	loadProgramStateOnBeginning();
 	saveProgramStateOnExit();
 
@@ -155,6 +156,34 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	} catch (IOException e) {
 	    e.printStackTrace();
 	}
+    }
+
+    private static void loadProgramState() throws IOException {
+	loadListState("allRowsDataListState.dat", allRowsDataList);
+	for (int i = 0; i < allRowsDataList.size(); i++) {
+	    tableModel.insertData(allRowsDataList.get(i));
+	}
+	loadListState("checksumListState.dat", checksumList);
+	loadListState("allFilenamesListState.dat", allFilenameList);
+	loadListState("filesGotFromServerListState.dat", filesGotFromServerList);
+
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> void loadListState(String listStateFilename, List<T> listToLoad)
+	    throws IOException {
+	FileInputStream fileInProgram = new FileInputStream(listStateFilename);
+	ObjectInputStream objInProgram = new ObjectInputStream(fileInProgram);
+	try {
+	    ArrayList<T> objProgram = (ArrayList<T>) objInProgram.readObject();
+	    for (int i = 0; i < objProgram.size(); i++) {
+		listToLoad.add((T) objProgram.get(i));
+	    }
+	    objInProgram.close();
+	} catch (ClassNotFoundException e) {
+	    e.printStackTrace();
+	}
+
     }
 
     private static void saveProgramStateOnExit() {
@@ -171,100 +200,20 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	});
     }
 
-    private static void loadProgramState() throws IOException {
-	
-	FileInputStream fileInProgram = new FileInputStream("programSavedState.dat");
-	ObjectInputStream objInProgram = new ObjectInputStream(fileInProgram);
-	try {
-	    @SuppressWarnings("unchecked")
-	    ArrayList<String[]> objProgram = (ArrayList<String[]>) objInProgram.readObject();
-	    for (int i = 0; i < objProgram.size(); i++) {
-		allRowsDataList.add(objProgram.get(i));
-		tableModel.insertData(allRowsDataList.get(i));
-	    }
-	    objInProgram.close();
-	} catch (ClassNotFoundException e) {
-	    e.printStackTrace();
-	}
-
-	FileInputStream fileInChecksum = new FileInputStream("checksumSavedState.dat");
-	ObjectInputStream objInChecksum = new ObjectInputStream(fileInChecksum);
-	try {
-	    @SuppressWarnings("unchecked")
-	    ArrayList<String> objChecksum = (ArrayList<String>) objInChecksum.readObject();
-	    for (int i = 0; i < objChecksum.size(); i++) {
-		checksumList.add(objChecksum.get(i));
-	    }
-	    objInChecksum.close();
-	} catch (ClassNotFoundException e) {
-	    e.printStackTrace();
-	}
-
-	FileInputStream fileInAllFilenameList = new FileInputStream("allFilenamesSavedState.dat");
-	ObjectInputStream objInAllFilenameList = new ObjectInputStream(fileInAllFilenameList);
-	try {
-	    @SuppressWarnings("unchecked")
-	    ArrayList<String> objAllFilenameList = (ArrayList<String>) objInAllFilenameList
-	    .readObject();
-	    for (int i = 0; i < objAllFilenameList.size(); i++) {
-		allFilenameList.add(objAllFilenameList.get(i));
-	    }
-	    objInAllFilenameList.close();
-	} catch (ClassNotFoundException e) {
-	    e.printStackTrace();
-	}
-
-	FileInputStream fileInfilesGotFromServerList = new FileInputStream(
-		"filesGotFromServerSavedState.dat");
-	ObjectInputStream objInfilesGotFromServerList = new ObjectInputStream(fileInfilesGotFromServerList);
-	try {
-	    @SuppressWarnings("unchecked")
-	    ArrayList<String> objfilesGotFromServerList = (ArrayList<String>) objInfilesGotFromServerList
-	    .readObject();
-	    for (int i = 0; i < objfilesGotFromServerList.size(); i++) {
-		filesGotFromServerList.add(objfilesGotFromServerList.get(i));
-	    }
-	    objInfilesGotFromServerList.close();
-	} catch (ClassNotFoundException e) {
-	    e.printStackTrace();
-	}
-
-    }
-
     private static void saveProgramState() throws IOException {
-	FileOutputStream fileOutProgram = new FileOutputStream("programSavedState.dat");
-	ObjectOutputStream objOutProgram = new ObjectOutputStream(fileOutProgram);
-	objOutProgram.writeObject(allRowsDataList);
-	objOutProgram.close();
-
-	FileOutputStream fileOutChecksum = new FileOutputStream("checksumSavedState.dat");
-	ObjectOutputStream objOutChecksum = new ObjectOutputStream(fileOutChecksum);
-	objOutChecksum.writeObject(checksumList);
-	objOutChecksum.close();
-
-	FileOutputStream fileOutAllFilenameList = new FileOutputStream("allFilenamesSavedState.dat");
-	ObjectOutputStream objOutAllFilenameList = new ObjectOutputStream(fileOutAllFilenameList);
-	objOutAllFilenameList.writeObject(allFilenameList);
-	objOutAllFilenameList.close();
-
-	FileOutputStream fileOutfilesGotFromServerList = new FileOutputStream(
-		"filesGotFromServerListSavedState.dat");
-	ObjectOutputStream objOutfilesGotFromServerList = new ObjectOutputStream(
-		fileOutfilesGotFromServerList);
-	objOutfilesGotFromServerList.writeObject(filesGotFromServerList);
-	objOutfilesGotFromServerList.close();
+	saveListState("allRowsDataListState.dat", allRowsDataList);
+	saveListState("checksumListState.dat", checksumList);
+	saveListState("allFilenamesListState.dat", allFilenameList);
+	saveListState("filesGotFromServerListState.dat", filesGotFromServerList);
     }
 
-    public static void main(String[] args) throws Exception {
-
-	server.startServer();
-	client.startClient();
-
-	SwingUtilities.invokeLater(new Runnable() {
-	    public void run() {
-		createAndShowGUI();
-	    }
-	});
+    private static <T> void saveListState(String listStateFilename, List<T> listToSave)
+	    throws IOException {
+	FileOutputStream fileOutProgram;
+	fileOutProgram = new FileOutputStream(listStateFilename);
+	ObjectOutputStream objOutProgram = new ObjectOutputStream(fileOutProgram);
+	objOutProgram.writeObject(listToSave);
+	objOutProgram.close();
     }
 
     @Override
@@ -319,7 +268,6 @@ public class MainGuiClass extends JPanel implements ActionListener {
 		@Override
 		public void run() {
 		    for (int i = 0; i < file.length; i++) {
-
 			try {
 			    if (!checksumList.contains(computeMD5(file[i]))) {
 				String currentFilename;
@@ -332,7 +280,8 @@ public class MainGuiClass extends JPanel implements ActionListener {
 				    int rowToRemove = allFilenameList.indexOf(currentFilename);
 				    removeCurrentFile(rowToRemove);
 				}
-				// w removeCurrentFile usuwam nazwe pliku z allFilenameList,
+				// w removeCurrentFile usuwam nazwe pliku z
+				// allFilenameList,
 				// wiec 'nadpisuje' to miejsce na liscie
 				allFilenameList.add(currentFilename);
 				try {
@@ -355,7 +304,6 @@ public class MainGuiClass extends JPanel implements ActionListener {
 			    e.printStackTrace();
 			}
 		    }
-
 		}
 	    });
 	    sendFilesFromClientThread.start();
@@ -395,9 +343,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
     }
 
     private void removeFileButtonAction(ActionEvent e) throws RemoteException {
-
 	int[] rowsSelected = table.getSelectedRows();
-
 	for (int i = 0; i < rowsSelected.length; i++) {
 	    removeCurrentFile(rowsSelected[i] - i);
 	}
@@ -423,7 +369,6 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	    e.printStackTrace();
 	}
 	client.removeFileFromClient(currentFileToRemove);
-
 	allFilenameList.remove(row);
 
     }
@@ -479,5 +424,17 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	}
 
 	return sb.toString();
+    }
+
+    public static void main(String[] args) throws Exception {
+
+	server.startServer();
+	client.startClient();
+
+	SwingUtilities.invokeLater(new Runnable() {
+	    public void run() {
+		createAndShowGUI();
+	    }
+	});
     }
 }
