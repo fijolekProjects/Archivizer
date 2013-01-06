@@ -15,6 +15,6 @@ public interface RemoteFileServer extends Remote {
     public String getFromServerGotFilename() throws RemoteException;
 
     public void setFromServerGotFilename(String fromServerGotFilename) throws RemoteException;
-    
+
     public void removeFileFromServer(String filename) throws RemoteException;
 }

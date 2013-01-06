@@ -28,17 +28,12 @@ import java.util.Vector;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
-
-import sun.awt.geom.AreaOp.AddOp;
 
 public class MainGuiClass extends JPanel implements ActionListener {
     /**
@@ -53,13 +48,12 @@ public class MainGuiClass extends JPanel implements ActionListener {
     private JFileChooser fileChooser;
     private final JTable table;
 
-    private String tempDirectory = System.getProperty("java.io.tmpdir");
     private RemoteFileServer stubServer;
 
     private static MyTableModel tableModel;
     private static JFrame frame;
     private static FileServer server = new FileServer();
-    private static TestClient client = new TestClient();
+    private static FileClient client = new FileClient();
     private static List<String[]> allRowsDataList = new ArrayList<String[]>();
     private static List<String> checksumList = new ArrayList<String>();
     private static List<String> allFilenameList = new ArrayList<String>();
@@ -67,6 +61,17 @@ public class MainGuiClass extends JPanel implements ActionListener {
 
     private String tempFromClientSentFilename;
     private String[] tempData;
+
+    private static String hostName;
+    private static int portNumber;
+
+    public static void setHostName(String hostName) {
+	MainGuiClass.hostName = hostName;
+    }
+
+    public static void setPortNumber(int portNumber) {
+	MainGuiClass.portNumber = portNumber;
+    }
 
     public MainGuiClass() {
 	super(new BorderLayout());
@@ -80,11 +85,11 @@ public class MainGuiClass extends JPanel implements ActionListener {
 
 	sendFileToServer = new JButton("Add file to server");
 	sendFileToServer.addActionListener(this);
-	add(sendFileToServer, BorderLayout.AFTER_LINE_ENDS);
+	add(sendFileToServer, BorderLayout.EAST);
 
 	removeFile = new JButton("Remove file");
 	removeFile.addActionListener(this);
-	add(removeFile, BorderLayout.AFTER_LAST_LINE);
+	add(removeFile, BorderLayout.SOUTH);
 
 	getFileFromServer = new JButton("Get file from server");
 	getFileFromServer.addActionListener(this);
@@ -149,6 +154,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	MainGuiClass newContentPane = new MainGuiClass();
 	frame.setContentPane(newContentPane);
 	frame.setSize(1000, 600);
+	frame.setLocationRelativeTo(null);
 	frame.setVisible(true);
 
 	loadProgramStateOnBeginning();
@@ -250,6 +256,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	String filenameToOpen = allFilenameList.get(rowSelected);
 
 	if (filesGotFromServerList.contains(filenameToOpen)) {
+	    String tempDirectory = System.getProperty("java.io.tmpdir");
 	    File fileToOpen = new File(tempDirectory + File.separator + "clientSide__"
 		    + filenameToOpen);
 	    try {
@@ -280,7 +287,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 				currentFilename = file[i].getName();
 
 				tempFromClientSentFilename = file[i].getAbsoluteFile().toString();
-				TestClient.setFromClientSentFilename(tempFromClientSentFilename);
+				FileClient.setFromClientSentFilename(tempFromClientSentFilename);
 
 				if (allFilenameList.contains(currentFilename)) {
 				    int rowToRemove = allFilenameList.indexOf(currentFilename);
@@ -378,14 +385,12 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	// TODO zostawic?
 	// remove real file from client
 	// client.removeFileFromClient(currentFileToRemove);
-	
-	
 
     }
 
     private void createStubServer() {
 	try {
-	    Registry registry = LocateRegistry.getRegistry();
+	    Registry registry = LocateRegistry.getRegistry(hostName, portNumber);
 	    stubServer = (RemoteFileServer) registry.lookup("RemoteFileServer");
 	} catch (RemoteException | NotBoundException e) {
 	    e.printStackTrace();
@@ -436,15 +441,15 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	return sb.toString();
     }
 
-    public static void main(String[] args) throws Exception {
+    public static void start() throws Exception {
+	server.startServer(portNumber);
+	client.startClient(hostName, portNumber);
 
 	SwingUtilities.invokeLater(new Runnable() {
 	    public void run() {
 		createAndShowGUI();
 	    }
 	});
-	server.startServer();
-	// TODO dodac wybieranie hostname i port przez uzytkownika
-	client.startClient("localhost", 1099);
+
     }
 }

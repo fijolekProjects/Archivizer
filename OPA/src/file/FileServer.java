@@ -20,16 +20,17 @@ import com.healthmarketscience.rmiio.RemoteOutputStreamClient;
 public class FileServer implements RemoteFileServer {
     private static String fromServerGotFilename;
     private String tempDirectory = System.getProperty("java.io.tmpdir");
-    private RemoteClient stubClient;
-    
-    public void startServer() throws Exception {
+    private RemoteFileClient stubClient;
+    private static Registry registry;
+
+    public void startServer(int portNumber) throws Exception {
 
 	FileServer server = new FileServer();
 	RemoteFileServer stubServer = (RemoteFileServer) UnicastRemoteObject
 		.exportObject(server, 0);
 
 	// bind to registry
-	Registry registry = LocateRegistry.getRegistry();
+	registry = LocateRegistry.getRegistry(portNumber);
 	registry.bind("RemoteFileServer", stubServer);
 
 	System.out.println("Server ready");
@@ -52,15 +53,16 @@ public class FileServer implements RemoteFileServer {
 	InputStream istream = RemoteInputStreamClient.wrap(ristream);
 	FileOutputStream ostream = null;
 	String fileToSend = null;
-	try {	    
+	try {
 	    createStubClient();
 	    fileToSend = stubClient.getFromClientSentFilename();
-	    
+
 	    int lastIndexOfSlash = fileToSend.lastIndexOf("\\");
 	    String fileNameString = fileToSend.substring(lastIndexOfSlash + 1);
 	    System.out.println(fileNameString);
 
-	    ostream = new FileOutputStream(tempDirectory + File.separator + "serverSide__" + fileNameString);
+	    ostream = new FileOutputStream(tempDirectory + File.separator + "serverSide__"
+		    + fileNameString);
 	    System.out.println("Writing file " + fileNameString);
 	    byte[] buf = new byte[1024];
 
@@ -90,19 +92,19 @@ public class FileServer implements RemoteFileServer {
 
     private void createStubClient() {
 	try {
-	    Registry registry = LocateRegistry.getRegistry();
-	    stubClient = (RemoteClient) registry.lookup("RemoteClient");
+	    // registry = LocateRegistry.getRegistry();
+	    stubClient = (RemoteFileClient) registry.lookup("RemoteFileClient");
 	} catch (RemoteException | NotBoundException e) {
 	    e.printStackTrace();
 	}
-	
+
     }
 
     @Override
     public void writeFileToClient(RemoteOutputStream rostream) throws IOException {
 	OutputStream ostream = RemoteOutputStreamClient.wrap(rostream);
-	FileInputStream istream = new FileInputStream(tempDirectory + File.separator + "serverSide__"
-		+ fromServerGotFilename);
+	FileInputStream istream = new FileInputStream(tempDirectory + File.separator
+		+ "serverSide__" + fromServerGotFilename);
 	try {
 	    byte[] buf = new byte[1024];
 	    int bytesRead = 0;
