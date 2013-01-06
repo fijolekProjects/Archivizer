@@ -3,8 +3,10 @@ package file;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
 
 import com.healthmarketscience.rmiio.SimpleRemoteInputStream;
 import com.healthmarketscience.rmiio.SimpleRemoteOutputStream;
@@ -15,23 +17,33 @@ import com.healthmarketscience.rmiio.SimpleRemoteOutputStream;
  * 
  * @author James Ahlborn
  */
-public class TestClient {
+public class TestClient implements RemoteClient{
     private static String fromClientSentFilename;
 
-    public static String getFromClientSentFilename() {
+    @Override
+    public String getFromClientSentFilename() throws RemoteException {
 	return fromClientSentFilename;
     }
 
     public static void setFromClientSentFilename(String fileName) {
 	TestClient.fromClientSentFilename = fileName;
     }
-
+    
+    public void startClient() throws Exception {
+	TestClient client = new TestClient();
+	RemoteClient stubClient = (RemoteClient) UnicastRemoteObject.exportObject(client, 0);
+	
+	// bind to registry
+	Registry registry = LocateRegistry.getRegistry();
+	registry.bind("RemoteClient", stubClient);
+    }
+    @Override
     public void sendFileFromClient() throws Exception {
 	// grab the file name from the commandline
 
-	// get a handle to the remote service to which we want to send the file
+	// get a handle to the remote service to which we want to send the file	
 	Registry registry = LocateRegistry.getRegistry();
-	RemoteFileServer stub = (RemoteFileServer) registry.lookup("RemoteFileServer");
+	RemoteFileServer stubServer = (RemoteFileServer) registry.lookup("RemoteFileServer");
 
 	System.out.println("Sending file from client" + fromClientSentFilename);
 
@@ -46,7 +58,7 @@ public class TestClient {
 	    // call the remote method on the server. the server will actually
 	    // interact with the RMI "server" we started above to retrieve the
 	    // file data
-	    stub.sendFile(istream.export());
+	    stubServer.sendFileToServer(istream.export());
 
 	} finally {
 	    // always make a best attempt to shutdown RemoteInputStream
@@ -55,27 +67,34 @@ public class TestClient {
 	System.out.println("Finished sending file " + fromClientSentFilename);
 
     }
-
+    @Override
     public void getFileFromServer() throws Exception {
 	Registry registry = LocateRegistry.getRegistry();
-	RemoteFileServer stub = (RemoteFileServer) registry.lookup("RemoteFileServer");
+	RemoteFileServer stubServer = (RemoteFileServer) registry.lookup("RemoteFileServer");
 	System.out.println("Sending file from server");
-	String tDir = System.getProperty("java.io.tmpdir");
+	String tempDirectory = System.getProperty("java.io.tmpdir");
 	SimpleRemoteOutputStream ostream;
-	ostream = new SimpleRemoteOutputStream(new FileOutputStream(tDir + File.separator
-		+ "fromServer" + FileServer.getFromServerGotFilename()));
+
+	ostream = new SimpleRemoteOutputStream(new FileOutputStream(tempDirectory + File.separator
+		+ "clientSide__" + stubServer.getFromServerGotFilename()));
 	try {
 	    // call the remote method on the server. the server will actually
 	    // interact with the RMI "server" we started above to retrieve the
 	    // file data
-	    stub.getFile(ostream.export());
+	    stubServer.writeFileToClient(ostream.export());
 
 	} finally {
 	    // always make a best attempt to shutdown RemoteInputStream
 	    ostream.close();
 	}
-	System.out.println("Finished sending file " + FileServer.getFromServerGotFilename());
-
+	System.out.println("Finished sending file " + stubServer.getFromServerGotFilename());
     }
+
+    public void removeFileFromClient(String filename) {
+	String tempDirectory = System.getProperty("java.io.tmpdir");
+	File fileToRemove = new File(tempDirectory + "clientSide__" + filename);
+	fileToRemove.delete();
+    }
+    
 
 }

@@ -12,6 +12,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.rmi.AccessException;
+import java.rmi.NotBoundException;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.DateFormat;
@@ -28,10 +33,10 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 
 public class MainGuiClass extends JPanel implements ActionListener {
-
     /**
      * 
      */
@@ -44,6 +49,8 @@ public class MainGuiClass extends JPanel implements ActionListener {
     private JFileChooser fileChooser;
     private final JTable table;
     private String currentFilename;
+    String tempDirectory = System.getProperty("java.io.tmpdir");
+    private RemoteFileServer stubServer;
 
     private static MyTableModel tableModel;
     private static JFrame frame;
@@ -53,7 +60,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
     private static List<String> checksumList = new ArrayList<String>();
     private static List<String> allFilenameList = new ArrayList<String>();
     private static List<String> filesGotFromServer = new ArrayList<String>();
-    
+
     private String tempFromClientSentFilename;
     private String[] tempData;
 
@@ -90,7 +97,6 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
-
 	private String[] columnNames = { "Filename", "Archivize Date", "Filesize", "MD5 checksum",
 	"Filepath" };
 	private Vector<Vector<Object>> data = new Vector<Vector<Object>>();
@@ -150,6 +156,25 @@ public class MainGuiClass extends JPanel implements ActionListener {
     private static void createAndShowGUI() {
 
 	frame = new JFrame("Archivizer");
+	frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+	MainGuiClass newContentPane = new MainGuiClass();
+	frame.setContentPane(newContentPane);
+	frame.setSize(1000, 600);
+	frame.setVisible(true);
+	loadProgramStateOnBeginning();
+	saveProgramStateOnExit();
+
+    }
+
+    private static void loadProgramStateOnBeginning() {
+	try {
+	    loadProgramState();
+	} catch (IOException e) {
+	    e.printStackTrace();
+	}
+    }
+
+    private static void saveProgramStateOnExit() {
 	frame.addWindowListener(new WindowAdapter() {
 	    @Override
 	    public void windowClosing(WindowEvent e) {
@@ -161,18 +186,6 @@ public class MainGuiClass extends JPanel implements ActionListener {
 		System.exit(0);
 	    }
 	});
-	frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-	MainGuiClass newContentPane = new MainGuiClass();
-	frame.setContentPane(newContentPane);
-	// Display the window.
-	frame.setSize(1000, 600);
-	try {
-	    loadProgramState();
-	} catch (IOException e2) {
-	    e2.printStackTrace();
-	}
-	// frame.pack();
-	frame.setVisible(true);
     }
 
     private static void loadProgramState() throws IOException {
@@ -207,7 +220,8 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	ObjectInputStream objInAllFilenameList = new ObjectInputStream(fileInAllFilenameList);
 	try {
 	    @SuppressWarnings("unchecked")
-	    ArrayList<String> objAllFilenameList = (ArrayList<String>) objInAllFilenameList.readObject();
+	    ArrayList<String> objAllFilenameList = (ArrayList<String>) objInAllFilenameList
+	    .readObject();
 	    for (int i = 0; i < objAllFilenameList.size(); i++) {
 		allFilenameList.add(objAllFilenameList.get(i));
 	    }
@@ -215,19 +229,21 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	} catch (ClassNotFoundException e) {
 	    e.printStackTrace();
 	}
-	
-	FileInputStream fileInFilesGotFromServer = new FileInputStream("filesGotFromServerSavedState.dat");
+
+	FileInputStream fileInFilesGotFromServer = new FileInputStream(
+		"filesGotFromServerSavedState.dat");
 	ObjectInputStream objInFilesGotFromServer = new ObjectInputStream(fileInFilesGotFromServer);
 	try {
 	    @SuppressWarnings("unchecked")
-	    ArrayList<String> objFilesGotFromServer = (ArrayList<String>) objInFilesGotFromServer.readObject();
+	    ArrayList<String> objFilesGotFromServer = (ArrayList<String>) objInFilesGotFromServer
+	    .readObject();
 	    for (int i = 0; i < objFilesGotFromServer.size(); i++) {
 		filesGotFromServer.add(objFilesGotFromServer.get(i));
 	    }
 	    objInFilesGotFromServer.close();
 	} catch (ClassNotFoundException e) {
 	    e.printStackTrace();
-	}	
+	}
 
     }
 
@@ -246,9 +262,11 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	ObjectOutputStream objOutAllFilenameList = new ObjectOutputStream(fileOutAllFilenameList);
 	objOutAllFilenameList.writeObject(allFilenameList);
 	objOutAllFilenameList.close();
-	
-	FileOutputStream fileOutFilesGotFromServer = new FileOutputStream("filesGotFromServerSavedState.dat");
-	ObjectOutputStream objOutFilesGotFromServer = new ObjectOutputStream(fileOutFilesGotFromServer);
+
+	FileOutputStream fileOutFilesGotFromServer = new FileOutputStream(
+		"filesGotFromServerSavedState.dat");
+	ObjectOutputStream objOutFilesGotFromServer = new ObjectOutputStream(
+		fileOutFilesGotFromServer);
 	objOutFilesGotFromServer.writeObject(filesGotFromServer);
 	objOutFilesGotFromServer.close();
     }
@@ -256,8 +274,9 @@ public class MainGuiClass extends JPanel implements ActionListener {
     public static void main(String[] args) throws Exception {
 
 	server.startServer();
+	client.startClient();
 
-	javax.swing.SwingUtilities.invokeLater(new Runnable() {
+	SwingUtilities.invokeLater(new Runnable() {
 	    public void run() {
 		createAndShowGUI();
 	    }
@@ -271,7 +290,12 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	    sendFileToServerButtonAction(e);
 	}
 	if (e.getSource() == removeFile) {
-	    removeFileButtonAction(e);
+	    try {
+		removeFileButtonAction(e);
+	    } catch (RemoteException e1) {
+		// TODO Auto-generated catch block
+		e1.printStackTrace();
+	    }
 	}
 	if (e.getSource() == getFileFromServer) {
 	    getFileFromServerButtonAction(e);
@@ -279,10 +303,8 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	if (e.getSource() == openFile) {
 	    openFileButtonAction(e);
 	}
- 
+
     }
-
-
 
     private void openFileButtonAction(ActionEvent e) {
 	Desktop desktop = Desktop.getDesktop();
@@ -290,18 +312,17 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	String filenameToOpen = allFilenameList.get(rowSelected);
 
 	if (filesGotFromServer.contains(filenameToOpen)) {
-	    String tDir = System.getProperty("java.io.tmpdir");
-	    File fileToOpen = new File(tDir + File.separator + "fromServer" + filenameToOpen);
+	    File fileToOpen = new File(tempDirectory + File.separator + "clientSide__"
+		    + filenameToOpen);
 	    try {
 		desktop.open(fileToOpen);
 	    } catch (IOException e1) {
-		// TODO Auto-generated catch block
 		e1.printStackTrace();
 	    }
 	} else {
 	    JOptionPane.showMessageDialog(frame, "File: " + filenameToOpen
-			+ " has not been got from server! Get file from server first",
-			"Warning!", JOptionPane.WARNING_MESSAGE);
+		    + " has not been got from server! Get file from server first", "Warning!",
+		    JOptionPane.WARNING_MESSAGE);
 	}
     }
 
@@ -310,7 +331,6 @@ public class MainGuiClass extends JPanel implements ActionListener {
 
 	if (returnVal == JFileChooser.APPROVE_OPTION) {
 	    final File file[] = fileChooser.getSelectedFiles();
-
 	    Thread sendFilesFromClientThread = new Thread(new Runnable() {
 
 		@Override
@@ -319,7 +339,6 @@ public class MainGuiClass extends JPanel implements ActionListener {
 
 			try {
 			    if (!checksumList.contains(computeMD5(file[i]))) {
-
 
 				tempFromClientSentFilename = file[i].getAbsoluteFile().toString();
 				TestClient.setFromClientSentFilename(tempFromClientSentFilename);
@@ -360,49 +379,72 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	    public void run() {
 		int[] rowsSelected = table.getSelectedRows();
 		for (int i = 0; i < rowsSelected.length; i++) {
-		    filesGotFromServer.add(allFilenameList.get(rowsSelected[i]));
-		    FileServer.setFromServerGotFilename(allFilenameList.get(rowsSelected[i]));
+
+		    String currentFileToGetFromServer = allFilenameList.get(rowsSelected[i]);
+		    createStubServer();
+		    try {
+			stubServer.setFromServerGotFilename(currentFileToGetFromServer);
+		    } catch (RemoteException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		    }
+
+		    if (!filesGotFromServer.contains(currentFileToGetFromServer)) {
+			filesGotFromServer.add(currentFileToGetFromServer);
+		    }
 		    try {
 			client.getFileFromServer();
 		    } catch (Exception e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		    }
-		}
 
+		}
 	    }
 	});
 	getFilesFromServerThread.start();
-	//	for (int i = 0; i < rowsSelected.length; i++) {
-	//	    FileServer.setFromServerGotFilename(allFilenameList.get(rowsSelected[i]));
-	//	    try {
-	//		client.getFileFromServer();
-	//	    } catch (Exception e1) {
-	//		// TODO Auto-generated catch block
-	//		e1.printStackTrace();
-	//	    }
-	//	}
     }
 
-    private void removeFileButtonAction(ActionEvent e) {
+    private void removeFileButtonAction(ActionEvent e) throws RemoteException {
 	try {
 	    int[] rowsSelected = table.getSelectedRows();
 
 	    for (int i = 0; i < rowsSelected.length; i++) {
+		String currentFileToRemove = allFilenameList.get(rowsSelected[i] - i);
+
 		tableModel.removeRow(rowsSelected[i] - i);
 		checksumList.remove(rowsSelected[i] - i);
 		allRowsData.remove(rowsSelected[i] - i);
-		allFilenameList.remove(rowsSelected[i] - i);
-		filesGotFromServer.remove(allFilenameList.get(rowsSelected[i] - i));
-	    }
+		if (!filesGotFromServer.isEmpty()) {
+		    if (filesGotFromServer.contains(currentFileToRemove)) {
+			filesGotFromServer.remove(currentFileToRemove);
+		    }
+		}
+		createStubServer();
 
+		stubServer.removeFileFromServer(currentFileToRemove);
+		client.removeFileFromClient(currentFileToRemove);
+
+		allFilenameList.remove(rowsSelected[i] - i);
+	    }
 	} catch (ArrayIndexOutOfBoundsException ex) {
-	    // Nothing happens, only to preserve printing exception to console
+	    ex.printStackTrace();
 	}
     }
 
+    private void createStubServer() {
+
+	try {
+	    Registry registry = LocateRegistry.getRegistry();
+	    stubServer = (RemoteFileServer) registry.lookup("RemoteFileServer");
+	} catch (RemoteException | NotBoundException e) {
+	    // TODO Auto-generated catch block
+	    e.printStackTrace();
+	}
+
+    }
 
     private String[] prepareRowData(File file) {
+	// TODO FILEPATH
 	String fileName = file.getName();
 	DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm");
 	Calendar cal = Calendar.getInstance();
@@ -411,7 +453,6 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	String MD5checksum = null;
 	String filePath = file.getAbsolutePath();
 	try {
-
 	    MD5checksum = computeMD5(file);
 	    checksumList.add(MD5checksum);
 	} catch (NoSuchAlgorithmException | IOException e) {
@@ -425,7 +466,6 @@ public class MainGuiClass extends JPanel implements ActionListener {
     }
 
     private String computeMD5(File file) throws NoSuchAlgorithmException, IOException {
-
 	MessageDigest md = MessageDigest.getInstance("MD5");
 	FileInputStream fis = new FileInputStream(file);
 	byte[] dataBytes = new byte[1024];
