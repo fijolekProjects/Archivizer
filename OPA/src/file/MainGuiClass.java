@@ -102,7 +102,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	 */
 	private static final long serialVersionUID = 1L;
 	private String[] columnNames = { "Filename", "Archivize Date", "Filesize", "MD5 checksum",
-	"Original Filepath" };
+		"Original Filepath" };
 	private Vector<Vector<Object>> data = new Vector<Vector<Object>>();
 
 	@Override
@@ -147,6 +147,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 
 	frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 	MainGuiClass newContentPane = new MainGuiClass();
+	frame.setContentPane(newContentPane);
 	frame.setSize(1000, 600);
 	frame.setVisible(true);
 
@@ -357,7 +358,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 
     private void removeCurrentFile(int row) {
 	String currentFileToRemove = allFilenameList.get(row);
-
+	// remove file from all lists
 	tableModel.removeRow(row);
 	checksumList.remove(row);
 	allRowsDataList.remove(row);
@@ -366,16 +367,19 @@ public class MainGuiClass extends JPanel implements ActionListener {
 		filesGotFromServerList.remove(currentFileToRemove);
 	    }
 	}
+	allFilenameList.remove(row);
+	// remove real file form server
 	createStubServer();
-
 	try {
 	    stubServer.removeFileFromServer(currentFileToRemove);
 	} catch (RemoteException e) {
 	    e.printStackTrace();
 	}
-	// client.removeFileFromClient(currentFileToRemove);
 	// TODO zostawic?
-	allFilenameList.remove(row);
+	// remove real file from client
+	// client.removeFileFromClient(currentFileToRemove);
+	
+	
 
     }
 
