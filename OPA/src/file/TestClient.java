@@ -3,6 +3,7 @@ package file;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -19,7 +20,8 @@ import com.healthmarketscience.rmiio.SimpleRemoteOutputStream;
  */
 public class TestClient implements RemoteClient{
     private static String fromClientSentFilename;
-
+    private RemoteFileServer stubServer;
+    
     @Override
     public String getFromClientSentFilename() throws RemoteException {
 	return fromClientSentFilename;
@@ -42,9 +44,8 @@ public class TestClient implements RemoteClient{
 	// grab the file name from the commandline
 
 	// get a handle to the remote service to which we want to send the file	
-	Registry registry = LocateRegistry.getRegistry();
-	RemoteFileServer stubServer = (RemoteFileServer) registry.lookup("RemoteFileServer");
-
+	
+	
 	System.out.println("Sending file from client" + fromClientSentFilename);
 
 	// setup the remote input stream. note, the client here is actually
@@ -58,6 +59,7 @@ public class TestClient implements RemoteClient{
 	    // call the remote method on the server. the server will actually
 	    // interact with the RMI "server" we started above to retrieve the
 	    // file data
+	    createStubServer();
 	    stubServer.sendFileToServer(istream.export());
 
 	} finally {
@@ -69,12 +71,12 @@ public class TestClient implements RemoteClient{
     }
     @Override
     public void getFileFromServer() throws Exception {
-	Registry registry = LocateRegistry.getRegistry();
-	RemoteFileServer stubServer = (RemoteFileServer) registry.lookup("RemoteFileServer");
+	
 	System.out.println("Sending file from server");
 	String tempDirectory = System.getProperty("java.io.tmpdir");
 	SimpleRemoteOutputStream ostream;
 
+	createStubServer();
 	ostream = new SimpleRemoteOutputStream(new FileOutputStream(tempDirectory + File.separator
 		+ "clientSide__" + stubServer.getFromServerGotFilename()));
 	try {
@@ -96,5 +98,12 @@ public class TestClient implements RemoteClient{
 	fileToRemove.delete();
     }
     
-
+    private void createStubServer() {
+	try {
+	    Registry registry = LocateRegistry.getRegistry();
+	    stubServer = (RemoteFileServer) registry.lookup("RemoteFileServer");
+	} catch (RemoteException | NotBoundException e) {
+	    e.printStackTrace();
+	}
+    }
 }

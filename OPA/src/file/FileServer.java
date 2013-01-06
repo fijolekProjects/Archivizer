@@ -20,7 +20,8 @@ import com.healthmarketscience.rmiio.RemoteOutputStreamClient;
 public class FileServer implements RemoteFileServer {
     private static String fromServerGotFilename;
     private String tempDirectory = System.getProperty("java.io.tmpdir");
-
+    private RemoteClient stubClient;
+    
     public void startServer() throws Exception {
 
 	FileServer server = new FileServer();
@@ -50,21 +51,14 @@ public class FileServer implements RemoteFileServer {
     public void sendFileToServer(RemoteInputStream ristream) throws IOException {
 	InputStream istream = RemoteInputStreamClient.wrap(ristream);
 	FileOutputStream ostream = null;
-	String fn = null;
-	try {
-	    Registry registry = LocateRegistry.getRegistry();
-	    RemoteClient stubClient;
-	    try {
-		stubClient = (RemoteClient) registry.lookup("RemoteClient");
-		fn = stubClient.getFromClientSentFilename();
-	    } catch (NotBoundException e) {
-		e.printStackTrace();
-	    }
-
-	    int lastIndexOfSlash = fn.lastIndexOf("\\");
-	    String fileNameString = fn.substring(lastIndexOfSlash + 1);
+	String fileToSend = null;
+	try {	    
+	    createStubClient();
+	    fileToSend = stubClient.getFromClientSentFilename();
+	    
+	    int lastIndexOfSlash = fileToSend.lastIndexOf("\\");
+	    String fileNameString = fileToSend.substring(lastIndexOfSlash + 1);
 	    System.out.println(fileNameString);
-
 
 	    ostream = new FileOutputStream(tempDirectory + File.separator + "serverSide__" + fileNameString);
 	    System.out.println("Writing file " + fileNameString);
@@ -92,6 +86,16 @@ public class FileServer implements RemoteFileServer {
 	    }
 	}
 
+    }
+
+    private void createStubClient() {
+	try {
+	    Registry registry = LocateRegistry.getRegistry();
+	    stubClient = (RemoteClient) registry.lookup("RemoteClient");
+	} catch (RemoteException | NotBoundException e) {
+	    e.printStackTrace();
+	}
+	
     }
 
     @Override

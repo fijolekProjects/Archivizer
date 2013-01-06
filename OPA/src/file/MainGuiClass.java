@@ -12,7 +12,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.rmi.AccessException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -48,18 +47,18 @@ public class MainGuiClass extends JPanel implements ActionListener {
     private JButton openFile;
     private JFileChooser fileChooser;
     private final JTable table;
-    private String currentFilename;
-    String tempDirectory = System.getProperty("java.io.tmpdir");
+
+    private String tempDirectory = System.getProperty("java.io.tmpdir");
     private RemoteFileServer stubServer;
 
     private static MyTableModel tableModel;
     private static JFrame frame;
     private static FileServer server = new FileServer();
     private static TestClient client = new TestClient();
-    private static List<String[]> allRowsData = new ArrayList<String[]>();
+    private static List<String[]> allRowsDataList = new ArrayList<String[]>();
     private static List<String> checksumList = new ArrayList<String>();
     private static List<String> allFilenameList = new ArrayList<String>();
-    private static List<String> filesGotFromServer = new ArrayList<String>();
+    private static List<String> filesGotFromServerList = new ArrayList<String>();
 
     private String tempFromClientSentFilename;
     private String[] tempData;
@@ -98,7 +97,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	 */
 	private static final long serialVersionUID = 1L;
 	private String[] columnNames = { "Filename", "Archivize Date", "Filesize", "MD5 checksum",
-	"Filepath" };
+	"Original Filepath" };
 	private Vector<Vector<Object>> data = new Vector<Vector<Object>>();
 
 	@Override
@@ -118,25 +117,9 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	    return ((Vector<?>) data.get(row)).get(col);
 	}
 
+	@Override
 	public String getColumnName(int col) {
 	    return columnNames[col];
-	}
-
-	public Class<? extends Object> getColumnClass(int c) {
-	    return getValueAt(0, c).getClass();
-	}
-
-	public void setValueAt(Object value, int row, int col) {
-	    ((Vector<Object>) data.get(row)).setElementAt(value, col);
-	    fireTableCellUpdated(row, col);
-	}
-
-	public boolean isCellEditable(int row, int col) {
-	    if (columnNames.length == col) {
-		return true;
-	    } else {
-		return false;
-	    }
 	}
 
 	public void insertData(String[] values) {
@@ -189,14 +172,15 @@ public class MainGuiClass extends JPanel implements ActionListener {
     }
 
     private static void loadProgramState() throws IOException {
+	
 	FileInputStream fileInProgram = new FileInputStream("programSavedState.dat");
 	ObjectInputStream objInProgram = new ObjectInputStream(fileInProgram);
 	try {
 	    @SuppressWarnings("unchecked")
 	    ArrayList<String[]> objProgram = (ArrayList<String[]>) objInProgram.readObject();
 	    for (int i = 0; i < objProgram.size(); i++) {
-		allRowsData.add(objProgram.get(i));
-		tableModel.insertData(allRowsData.get(i));
+		allRowsDataList.add(objProgram.get(i));
+		tableModel.insertData(allRowsDataList.get(i));
 	    }
 	    objInProgram.close();
 	} catch (ClassNotFoundException e) {
@@ -230,17 +214,17 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	    e.printStackTrace();
 	}
 
-	FileInputStream fileInFilesGotFromServer = new FileInputStream(
+	FileInputStream fileInfilesGotFromServerList = new FileInputStream(
 		"filesGotFromServerSavedState.dat");
-	ObjectInputStream objInFilesGotFromServer = new ObjectInputStream(fileInFilesGotFromServer);
+	ObjectInputStream objInfilesGotFromServerList = new ObjectInputStream(fileInfilesGotFromServerList);
 	try {
 	    @SuppressWarnings("unchecked")
-	    ArrayList<String> objFilesGotFromServer = (ArrayList<String>) objInFilesGotFromServer
+	    ArrayList<String> objfilesGotFromServerList = (ArrayList<String>) objInfilesGotFromServerList
 	    .readObject();
-	    for (int i = 0; i < objFilesGotFromServer.size(); i++) {
-		filesGotFromServer.add(objFilesGotFromServer.get(i));
+	    for (int i = 0; i < objfilesGotFromServerList.size(); i++) {
+		filesGotFromServerList.add(objfilesGotFromServerList.get(i));
 	    }
-	    objInFilesGotFromServer.close();
+	    objInfilesGotFromServerList.close();
 	} catch (ClassNotFoundException e) {
 	    e.printStackTrace();
 	}
@@ -250,7 +234,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
     private static void saveProgramState() throws IOException {
 	FileOutputStream fileOutProgram = new FileOutputStream("programSavedState.dat");
 	ObjectOutputStream objOutProgram = new ObjectOutputStream(fileOutProgram);
-	objOutProgram.writeObject(allRowsData);
+	objOutProgram.writeObject(allRowsDataList);
 	objOutProgram.close();
 
 	FileOutputStream fileOutChecksum = new FileOutputStream("checksumSavedState.dat");
@@ -263,12 +247,12 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	objOutAllFilenameList.writeObject(allFilenameList);
 	objOutAllFilenameList.close();
 
-	FileOutputStream fileOutFilesGotFromServer = new FileOutputStream(
-		"filesGotFromServerSavedState.dat");
-	ObjectOutputStream objOutFilesGotFromServer = new ObjectOutputStream(
-		fileOutFilesGotFromServer);
-	objOutFilesGotFromServer.writeObject(filesGotFromServer);
-	objOutFilesGotFromServer.close();
+	FileOutputStream fileOutfilesGotFromServerList = new FileOutputStream(
+		"filesGotFromServerListSavedState.dat");
+	ObjectOutputStream objOutfilesGotFromServerList = new ObjectOutputStream(
+		fileOutfilesGotFromServerList);
+	objOutfilesGotFromServerList.writeObject(filesGotFromServerList);
+	objOutfilesGotFromServerList.close();
     }
 
     public static void main(String[] args) throws Exception {
@@ -293,7 +277,6 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	    try {
 		removeFileButtonAction(e);
 	    } catch (RemoteException e1) {
-		// TODO Auto-generated catch block
 		e1.printStackTrace();
 	    }
 	}
@@ -311,7 +294,7 @@ public class MainGuiClass extends JPanel implements ActionListener {
 	int rowSelected = table.getSelectedRow();
 	String filenameToOpen = allFilenameList.get(rowSelected);
 
-	if (filesGotFromServer.contains(filenameToOpen)) {
+	if (filesGotFromServerList.contains(filenameToOpen)) {
 	    File fileToOpen = new File(tempDirectory + File.separator + "clientSide__"
 		    + filenameToOpen);
 	    try {
@@ -339,29 +322,37 @@ public class MainGuiClass extends JPanel implements ActionListener {
 
 			try {
 			    if (!checksumList.contains(computeMD5(file[i]))) {
+				String currentFilename;
+				currentFilename = file[i].getName();
 
 				tempFromClientSentFilename = file[i].getAbsoluteFile().toString();
 				TestClient.setFromClientSentFilename(tempFromClientSentFilename);
 
-				allFilenameList.add(file[i].getName());
+				if (allFilenameList.contains(currentFilename)) {
+				    int rowToRemove = allFilenameList.indexOf(currentFilename);
+				    removeCurrentFile(rowToRemove);
+				}
+				// w removeCurrentFile usuwam nazwe pliku z allFilenameList,
+				// wiec 'nadpisuje' to miejsce na liscie
+				allFilenameList.add(currentFilename);
 				try {
 				    client.sendFileFromClient();
-				} catch (Exception e1) {
-				    e1.printStackTrace();
+				} catch (Exception e) {
+				    e.printStackTrace();
 				}
 
 				tempData = prepareRowData(file[i]);
-				allRowsData.add(tempData);
+				allRowsDataList.add(tempData);
 				tableModel.insertData(tempData);
 
 			    } else {
-				currentFilename = file[i].getName();
-				JOptionPane.showMessageDialog(frame, "File: " + currentFilename
+
+				JOptionPane.showMessageDialog(frame, "File: " + file[i].getName()
 					+ " has been already archivized! Try different file.",
 					"Warning!", JOptionPane.WARNING_MESSAGE);
 			    }
-			} catch (NoSuchAlgorithmException | IOException e2) {
-			    e2.printStackTrace();
+			} catch (NoSuchAlgorithmException | IOException e) {
+			    e.printStackTrace();
 			}
 		    }
 
@@ -385,12 +376,11 @@ public class MainGuiClass extends JPanel implements ActionListener {
 		    try {
 			stubServer.setFromServerGotFilename(currentFileToGetFromServer);
 		    } catch (RemoteException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		    }
 
-		    if (!filesGotFromServer.contains(currentFileToGetFromServer)) {
-			filesGotFromServer.add(currentFileToGetFromServer);
+		    if (!filesGotFromServerList.contains(currentFileToGetFromServer)) {
+			filesGotFromServerList.add(currentFileToGetFromServer);
 		    }
 		    try {
 			client.getFileFromServer();
@@ -405,42 +395,46 @@ public class MainGuiClass extends JPanel implements ActionListener {
     }
 
     private void removeFileButtonAction(ActionEvent e) throws RemoteException {
-	try {
-	    int[] rowsSelected = table.getSelectedRows();
 
-	    for (int i = 0; i < rowsSelected.length; i++) {
-		String currentFileToRemove = allFilenameList.get(rowsSelected[i] - i);
+	int[] rowsSelected = table.getSelectedRows();
 
-		tableModel.removeRow(rowsSelected[i] - i);
-		checksumList.remove(rowsSelected[i] - i);
-		allRowsData.remove(rowsSelected[i] - i);
-		if (!filesGotFromServer.isEmpty()) {
-		    if (filesGotFromServer.contains(currentFileToRemove)) {
-			filesGotFromServer.remove(currentFileToRemove);
-		    }
-		}
-		createStubServer();
-
-		stubServer.removeFileFromServer(currentFileToRemove);
-		client.removeFileFromClient(currentFileToRemove);
-
-		allFilenameList.remove(rowsSelected[i] - i);
-	    }
-	} catch (ArrayIndexOutOfBoundsException ex) {
-	    ex.printStackTrace();
+	for (int i = 0; i < rowsSelected.length; i++) {
+	    removeCurrentFile(rowsSelected[i] - i);
 	}
+
+    }
+
+    private void removeCurrentFile(int row) {
+	String currentFileToRemove = allFilenameList.get(row);
+
+	tableModel.removeRow(row);
+	checksumList.remove(row);
+	allRowsDataList.remove(row);
+	if (!filesGotFromServerList.isEmpty()) {
+	    if (filesGotFromServerList.contains(currentFileToRemove)) {
+		filesGotFromServerList.remove(currentFileToRemove);
+	    }
+	}
+	createStubServer();
+
+	try {
+	    stubServer.removeFileFromServer(currentFileToRemove);
+	} catch (RemoteException e) {
+	    e.printStackTrace();
+	}
+	client.removeFileFromClient(currentFileToRemove);
+
+	allFilenameList.remove(row);
+
     }
 
     private void createStubServer() {
-
 	try {
 	    Registry registry = LocateRegistry.getRegistry();
 	    stubServer = (RemoteFileServer) registry.lookup("RemoteFileServer");
 	} catch (RemoteException | NotBoundException e) {
-	    // TODO Auto-generated catch block
 	    e.printStackTrace();
 	}
-
     }
 
     private String[] prepareRowData(File file) {
