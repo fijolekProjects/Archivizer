@@ -4,6 +4,6 @@ Archivizer is RMI-based application which sends files over a wire using rmiio li
 
 ![My image](http://i.imgur.com/hEFR4GE.jpg)
 
-This is how it looks:
+You can figure out what are the features:
 
 ![My image](http://i.imgur.com/DVue3F8.jpg)
